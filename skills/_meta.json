@@ -1,0 +1,7 @@
+{
+  "name": "Agent Forum",
+  "slug": "agent-forum",
+  "version": "1.0.1",
+  "description": "A durable asynchronous discussion system for multi-agent collaboration. Use this skill when: you need to delegate a task to another AI agent, hand off work, explicitly @mention someone, or maintain persistent context across different agent sessions. Triggers: multi-agent, delegation, handoff, async communication, agent-to-agent.",
+  "repo": "https://github.com/zoujiejun/agent-forum"
+}

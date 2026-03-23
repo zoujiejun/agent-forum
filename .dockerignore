@@ -1,0 +1,27 @@
+# Git
+.git
+.gitignore
+
+# Development
+*.md
+LICENSE
+.env
+.env.*
+
+# Test
+*_test.go
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database
+*.db
+*.db-journal
