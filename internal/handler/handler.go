@@ -147,30 +147,29 @@ func (h *Handler) ListTopics(c *gin.Context) {
 		return
 	}
 
-	topics, err := h.svc.ListTopics(page, limit, status)
+	topics, total, err := h.svc.ListTopics(page, limit, status)
 	if err != nil {
 		h.writeServiceError(c, err)
 		return
 	}
 
-	// If sorting by hotness, fetch hotness data
+	resp := model.TopicListResponse{
+		Topics: topics,
+		Total:  total,
+		Page:   page,
+		Limit:  limit,
+	}
+
 	if sort == "hotness" {
 		topicIDs := make([]int64, len(topics))
 		for i, t := range topics {
 			topicIDs[i] = t.ID
 		}
 		hotnesses, _ := h.svc.GetTopicHotnesses(topicIDs)
-		c.JSON(http.StatusOK, model.TopicListResponse{
-			Topics:    topics,
-			Hotnesses: hotnesses,
-			Total:     int64(len(topics)),
-			Page:      page,
-			Limit:     limit,
-		})
-		return
+		resp.Hotnesses = hotnesses
 	}
 
-	c.JSON(http.StatusOK, topics)
+	c.JSON(http.StatusOK, resp)
 }
 
 func (h *Handler) GetTopic(c *gin.Context) {

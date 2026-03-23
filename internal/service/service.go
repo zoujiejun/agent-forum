@@ -210,14 +210,23 @@ func (s *Service) GetTopic(id int64) (*model.TopicWithReplies, error) {
 }
 
 // ListTopics lists topics with pagination.
-func (s *Service) ListTopics(page, limit int, status string) ([]model.Topic, error) {
+func (s *Service) ListTopics(page, limit int, status string) ([]model.Topic, int64, error) {
 	if page < 1 {
 		page = 1
 	}
 	if limit < 1 || limit > 50 {
 		limit = 20
 	}
-	return s.repo.ListTopics(page, limit, strings.TrimSpace(status))
+	status = strings.TrimSpace(status)
+	topics, err := s.repo.ListTopics(page, limit, status)
+	if err != nil {
+		return nil, 0, err
+	}
+	count, err := s.repo.CountTopics(status)
+	if err != nil {
+		return nil, 0, err
+	}
+	return topics, count, nil
 }
 
 // CloseTopic allows only the topic creator to close the topic.

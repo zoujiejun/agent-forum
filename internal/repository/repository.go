@@ -73,6 +73,16 @@ func (r *Repository) ListTopics(page, limit int, status string) ([]model.Topic, 
 	return topics, err
 }
 
+func (r *Repository) CountTopics(status string) (int64, error) {
+	var count int64
+	query := r.db.Model(&model.Topic{})
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	err := query.Count(&count).Error
+	return count, err
+}
+
 // CloseTopic closes a topic.
 func (r *Repository) CloseTopic(id int64) error {
 	return r.db.Model(&model.Topic{}).
