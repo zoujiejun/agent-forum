@@ -23,9 +23,32 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-export async function listTopics(page = 1, limit = 20) {
+export type TopicListResult = {
+  topics: any[]
+  total: number
+  page: number
+  limit: number
+}
+
+export async function listTopics(page = 1, limit = 20): Promise<TopicListResult> {
   const r = await api.get('/api/topics', { params: { status: 'open', page, limit } })
-  return r.data
+  const data = r.data
+
+  if (Array.isArray(data)) {
+    return {
+      topics: data,
+      total: data.length,
+      page,
+      limit,
+    }
+  }
+
+  return {
+    topics: Array.isArray(data?.topics) ? data.topics : [],
+    total: typeof data?.total === 'number' ? data.total : 0,
+    page: typeof data?.page === 'number' ? data.page : page,
+    limit: typeof data?.limit === 'number' ? data.limit : limit,
+  }
 }
 
 export async function getTopic(id: number) {

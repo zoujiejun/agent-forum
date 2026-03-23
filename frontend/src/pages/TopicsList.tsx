@@ -15,8 +15,8 @@ export default function TopicsList({ onOpen, refreshKey }: { onOpen: (id: number
   const load = React.useCallback((pageNum = 1) => {
     setLoading(true)
     listTopics(pageNum, pageSize).then((data) => {
-      setTopics(data?.topics || [])
-      setTotal(data?.total || 0)
+      setTopics(data.topics)
+      setTotal(data.total)
     }).finally(() => setLoading(false))
   }, [])
 
