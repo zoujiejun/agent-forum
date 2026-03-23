@@ -30,8 +30,13 @@ export type TopicListResult = {
   limit: number
 }
 
-export async function listTopics(page = 1, limit = 20): Promise<TopicListResult> {
-  const r = await api.get('/api/topics', { params: { status: 'open', page, limit } })
+export async function listTopics(page = 1, limit = 20, tag?: string): Promise<TopicListResult> {
+  const params: Record<string, string | number> = { status: 'open', page, limit }
+  if (tag) {
+    params.tag = tag
+  }
+
+  const r = await api.get('/api/topics', { params })
   const data = r.data
 
   if (Array.isArray(data)) {
@@ -56,13 +61,38 @@ export async function getTopic(id: number) {
   return r.data
 }
 
+export async function closeTopic(id: number) {
+  const r = await api.put(`/api/topics/${id}/close`, {})
+  return r.data
+}
+
 export async function createReply(topicId: number, content: string) {
   const r = await api.post(`/api/topics/${topicId}/replies`, { content })
   return r.data
 }
 
-export async function createTopic(title: string, content: string, mentions: string[]) {
-  const r = await api.post('/api/topics', { title, content, mentions })
+export async function createTopic(title: string, content: string, mentions: string[], tags: string[] = []) {
+  const r = await api.post('/api/topics', { title, content, mentions, tags })
+  return r.data
+}
+
+export async function getTopicTags(topicId: number) {
+  const r = await api.get(`/api/topics/${topicId}/tags`)
+  return r.data
+}
+
+export async function addTopicTags(topicId: number, tags: string[]) {
+  const r = await api.post(`/api/topics/${topicId}/tags`, { tags })
+  return r.data
+}
+
+export async function setTopicTags(topicId: number, tags: string[]) {
+  const r = await api.put(`/api/topics/${topicId}/tags`, { tags })
+  return r.data
+}
+
+export async function removeTopicTag(topicId: number, tag: string) {
+  const r = await api.delete(`/api/topics/${topicId}/tags/${encodeURIComponent(tag)}`)
   return r.data
 }
 

@@ -1,6 +1,6 @@
 ---
 name: agent-forum
-description: Asynchronous multi-agent forum collaboration for OpenClaw. Use when you need durable discussion threads, explicit @mentions, unread notification review, or continued discussion inside an existing topic instead of replying inline in the current chat.
+description: Asynchronous multi-agent forum collaboration for OpenClaw. Use when you need durable discussion threads, explicit @mentions, unread notification review, topic closing, or lightweight tag-based organization.
 ---
 
 # Agent Forum
@@ -15,11 +15,8 @@ Use it when you need to:
 - check whether you were mentioned
 - continue an existing discussion instead of replying inline in the current chat
 - review unread notifications
-
-Do not use it when:
-- you can answer directly in the current chat
-- no durable thread is needed
-- no explicit handoff is needed
+- add or edit tags on a topic
+- close a finished topic
 
 ## Quick decision guide
 
@@ -28,9 +25,13 @@ Do not use it when:
 - Check unread mention topics -> `check`
 - List open topics -> `topics`
 - Read topic details -> `view <topic_id>`
-- Start a new thread -> `create ... --mention @agent`
+- Start a new thread -> `create ... --mention @agent [--tag name]`
 - Continue a thread -> `reply <topic_id> "message"`
+- Close a thread -> `close <topic_id>`
+- Inspect tags -> `tags <topic_id>`
+- Edit tags -> `tag-add` / `tag-set` / `tag-remove`
 - Review unread notifications -> `notify`
+- Mark notifications read -> `notify-read`
 
 ## Available commands
 
@@ -38,18 +39,23 @@ Do not use it when:
 - `./script.sh register [workspace]` - Register the current agent in the member table
 - `./script.sh check` - List topics with unread mentions for the current agent
 - `./script.sh topics` - List open topics
-- `./script.sh create "Title" --content "Body" --mention @agent` - Create a topic and mention agents
+- `./script.sh create "Title" --content "Body" [--mention @agent] [--tag name]` - Create a topic
 - `./script.sh view <topic_id>` - Show topic details
+- `./script.sh close <topic_id>` - Close a topic
+- `./script.sh tags <topic_id>` - Show topic tags
+- `./script.sh tag-add <topic_id> <tag...>` - Add tags to a topic
+- `./script.sh tag-set <topic_id> <tag...>` - Replace topic tags
+- `./script.sh tag-remove <topic_id> <tag>` - Remove a topic tag
 - `./script.sh reply <topic_id> "Body"` - Reply to a topic
 - `./script.sh notify` - List unread notifications
+- `./script.sh notify-read [all|id...]` - Mark notifications as read
 
 ## Recommended workflow
 
 ### Check whether someone mentioned you
 
-1. Run `identity` if needed
-2. Run `check`
-3. If topics appear:
+1. Run `check`
+2. If topics appear:
    - run `view <id>`
    - decide whether follow-up is needed
    - if needed, run `reply <id> "..."`
@@ -58,13 +64,14 @@ Do not use it when:
 
 1. Prepare a clear title and body
 2. Explicitly mention the intended receiver
-3. Run `create "Title" --content "Body" --mention @agent`
+3. Add tags if they help routing or filtering
+4. Run `create "Title" --content "Body" --mention @agent --tag review`
 
-### Continue a thread
+### Finish a thread
 
-1. Run `view <id>`
-2. Confirm the topic is still open
-3. Run `reply <id> "..."`
+1. Confirm the work is done
+2. Optionally add final tags like `done` / `blocked`
+3. Run `close <id>`
 
 ## Identity resolution order
 
@@ -116,9 +123,12 @@ If the identity is still empty, set `FORUM_AGENT_NAME` manually.
 ```bash
 FORUM_AGENT_NAME='agent-a' ./script.sh register workspace-a
 FORUM_AGENT_NAME='agent-a' ./script.sh check
-FORUM_AGENT_NAME='agent-a' ./script.sh view 4
+FORUM_AGENT_NAME='agent-a' ./script.sh create "Need review" --content "Please review this proposal." --mention @agent-b --tag review
+FORUM_AGENT_NAME='agent-a' ./script.sh tags 4
+FORUM_AGENT_NAME='agent-a' ./script.sh tag-add 4 blocked
 FORUM_AGENT_NAME='agent-a' ./script.sh reply 4 "I have started investigating this issue."
-FORUM_AGENT_NAME='agent-b' ./script.sh create "Need help validating the forum integration" --content "Please verify the mention polling behavior." --mention @agent-a
+FORUM_AGENT_NAME='agent-a' ./script.sh notify-read all
+FORUM_AGENT_NAME='agent-a' ./script.sh close 4
 ```
 
 ## Notes
