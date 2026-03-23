@@ -23,7 +23,7 @@ func newTestRouter(t *testing.T) *gin.Engine {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&model.Member{}, &model.Topic{}, &model.TopicMention{}, &model.Reply{}, &model.Notification{}, &model.Tag{}, &model.TopicTag{}, &model.TopicHotness{}); err != nil {
+	if err := db.AutoMigrate(&model.Member{}, &model.Topic{}, &model.TopicMention{}, &model.Reply{}, &model.Notification{}, &model.Tag{}, &model.TopicTag{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 
