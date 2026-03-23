@@ -1,18 +1,22 @@
-.PHONY: frontend-build build build-cli test docker-build docker-run docker-restart clean
+.PHONY: all help frontend-build build build-cli test docker-build docker-run docker-restart clean
 
+# Defaults (override on command line):
 REGISTRY ?= ghcr.io/example
 IMAGE_NAME ?= agent-forum
-IMAGE_REPOSITORY ?= $(REGISTRY)/$(IMAGE_NAME)
-IMAGE_MASTER ?= $(IMAGE_REPOSITORY):master
+IMAGE_VERSION ?= $(shell date +%Y%m%d_%H%M%S)
+IMAGE ?= $(REGISTRY)/$(IMAGE_NAME):$(IMAGE_VERSION)
+LATEST_TAG ?= latest
+IMAGE_LATEST ?= $(REGISTRY)/$(IMAGE_NAME):$(LATEST_TAG)
+
 GO ?= go
 NPM ?= npm
-BUILD_DATE := $(shell date +%Y%m%d)
-BUILD_TIME := $(shell date +%H%M%S)
-VERSION := $(BUILD_DATE)_$(BUILD_TIME)
-IMAGE_VERSION ?= $(IMAGE_REPOSITORY):$(VERSION)
+
+help:
+	@echo "Usage: make [target] [REGISTRY=...] [IMAGE_NAME=...] [IMAGE_VERSION=...] [LATEST_TAG=...]"
+	@echo "Targets: build, docker-build, docker-run, docker-restart, test, clean, help"
 
 frontend-build:
-	cd frontend && $(NPM) install && $(NPM) run build
+	cd frontend && $(NPM) install --no-audit --no-fund && $(NPM) run build
 
 build: frontend-build
 	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 $(GO) build -o bin/forum-server ./cmd/server
@@ -23,19 +27,24 @@ build-cli:
 test:
 	$(GO) test -v -coverprofile=coverage.out ./...
 
+# Build docker image; set REGISTRY, IMAGE_NAME, IMAGE_VERSION to control the image tag
 docker-build: build
-	@echo "Building image: $(IMAGE_MASTER)"
-	@echo "Building image: $(IMAGE_VERSION)"
-	sg docker -c 'docker build -t $(IMAGE_MASTER) -t $(IMAGE_VERSION) . && docker push $(IMAGE_MASTER) && docker push $(IMAGE_VERSION)'
+	@echo "Building image: $(IMAGE)"
+	@echo "Also tagging as: $(IMAGE_LATEST)"
+	docker build -t $(IMAGE) -t $(IMAGE_LATEST) .
+	docker push $(IMAGE)
+	docker push $(IMAGE_LATEST)
 
+# Run using the latest tag by default
 docker-run:
-	sg docker -c 'docker run -d --name agent-forum --restart=unless-stopped -p 8080:8080 -v $(PWD)/forum.db:/data/forum.db $(IMAGE_MASTER)'
+	-@docker rm -f agent-forum 2>/dev/null || true
+	docker run -d --name agent-forum --restart=unless-stopped -p 8080:8080 -v $(PWD)/forum.db:/data/forum.db $(IMAGE_LATEST)
 
 docker-restart:
-	sg docker -c 'docker rm -f agent-forum 2>/dev/null || true'
-	sg docker -c 'docker run -d --name agent-forum --restart=unless-stopped -p 8080:8080 -v $(PWD)/forum.db:/data/forum.db $(IMAGE_MASTER)'
-	sg docker -c 'docker ps -a | grep agent-forum'
-	curl -s http://localhost:8080/health
+	-@docker rm -f agent-forum 2>/dev/null || true
+	docker run -d --name agent-forum --restart=unless-stopped -p 8080:8080 -v $(PWD)/forum.db:/data/forum.db $(IMAGE_LATEST)
+	docker ps -a | grep agent-forum || true
+	curl -s http://localhost:8080/health || true
 
 clean:
 	rm -rf bin/ coverage.out frontend/dist
