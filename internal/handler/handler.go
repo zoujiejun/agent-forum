@@ -27,7 +27,6 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 		api.PATCH("/members/:id/workspace", h.UpdateMemberWorkspace)
 		api.POST("/topics", h.CreateTopic)
 		api.GET("/topics", h.ListTopics)
-		api.GET("/topics/hot", h.GetHotTopics)
 		api.GET("/topics/:id", h.GetTopic)
 		api.PUT("/topics/:id/close", h.CloseTopic)
 		api.PUT("/topics/:id/tags", h.UpdateTopicTags)
@@ -35,20 +34,12 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 		api.POST("/topics/:id/tags", h.AddTopicTags)
 		api.DELETE("/topics/:id/tags/:tag", h.RemoveTopicTag)
 		api.POST("/topics/:id/replies", h.CreateReply)
-		api.POST("/topics/:id/view", h.IncrementTopicView)
 		api.GET("/notifications", h.GetNotifications)
 		api.PUT("/notifications/read", h.MarkNotificationsRead)
 		api.GET("/agents/mentions", h.GetMentions)
 		api.GET("/agents/mentions/count", h.GetMentionCount)
 		api.GET("/tags", h.ListTags)
 		api.GET("/tags/:name/topics", h.GetTopicsByTag)
-		// Memory routes
-		api.PUT("/memory", h.UpsertMemory)
-		api.GET("/memory", h.GetMyMemories)
-		api.GET("/memory/shared", h.GetSharedMemories)
-		api.GET("/memory/member/:name", h.GetMemberMemories)
-		api.GET("/memory/:id", h.GetMemory)
-		api.DELETE("/memory/:id", h.DeleteMemory)
 	}
 }
 
@@ -74,7 +65,6 @@ func (h *Handler) RegisterMember(c *gin.Context) {
 		return
 	}
 
-	// X-Agent-Workspace header takes precedence over body value
 	workspace := c.GetHeader("X-Agent-Workspace")
 	if workspace == "" {
 		workspace = req.Workspace
@@ -122,27 +112,19 @@ func (h *Handler) ListTopics(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	status := c.Query("status")
-	sort := c.DefaultQuery("sort", "created_at") // created_at | hotness
-	tag := c.Query("tag")                        // filter by tag
+	tag := c.Query("tag")
 
-	// Tag filter takes precedence
 	if tag != "" {
 		topics, total, err := h.svc.ListTopicsByTag(tag, page, limit)
 		if err != nil {
 			h.writeServiceError(c, err)
 			return
 		}
-		topicIDs := make([]int64, len(topics))
-		for i, t := range topics {
-			topicIDs[i] = t.ID
-		}
-		hotnesses, _ := h.svc.GetTopicHotnesses(topicIDs)
 		c.JSON(http.StatusOK, model.TopicListResponse{
-			Topics:    topics,
-			Hotnesses: hotnesses,
-			Total:     total,
-			Page:      page,
-			Limit:     limit,
+			Topics: topics,
+			Total:  total,
+			Page:   page,
+			Limit:  limit,
 		})
 		return
 	}
@@ -153,23 +135,12 @@ func (h *Handler) ListTopics(c *gin.Context) {
 		return
 	}
 
-	resp := model.TopicListResponse{
+	c.JSON(http.StatusOK, model.TopicListResponse{
 		Topics: topics,
 		Total:  total,
 		Page:   page,
 		Limit:  limit,
-	}
-
-	if sort == "hotness" {
-		topicIDs := make([]int64, len(topics))
-		for i, t := range topics {
-			topicIDs[i] = t.ID
-		}
-		hotnesses, _ := h.svc.GetTopicHotnesses(topicIDs)
-		resp.Hotnesses = hotnesses
-	}
-
-	c.JSON(http.StatusOK, resp)
+	})
 }
 
 func (h *Handler) GetTopic(c *gin.Context) {
@@ -179,7 +150,7 @@ func (h *Handler) GetTopic(c *gin.Context) {
 		return
 	}
 
-	topic, err := h.svc.GetTopicWithHotness(id)
+	topic, err := h.svc.GetTopic(id)
 	if err != nil {
 		h.writeServiceError(c, err)
 		return
@@ -336,22 +307,6 @@ func (h *Handler) UpdateMemberWorkspace(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "workspace updated"})
 }
 
-// GetHotTopics returns hot topics.
-func (h *Handler) GetHotTopics(c *gin.Context) {
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
-	topics, hotnesses, err := h.svc.GetHotTopics(limit)
-	if err != nil {
-		h.writeServiceError(c, err)
-		return
-	}
-	hotnessMap := make(map[int64]model.TopicHotness)
-	for _, h := range hotnesses {
-		hotnessMap[h.TopicID] = h
-	}
-	c.JSON(http.StatusOK, gin.H{"topics": topics, "hotnesses": hotnessMap})
-}
-
-// GetTopicsByTag filters topics by tag.
 func (h *Handler) GetTopicsByTag(c *gin.Context) {
 	tagName := c.Param("name")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -361,21 +316,14 @@ func (h *Handler) GetTopicsByTag(c *gin.Context) {
 		h.writeServiceError(c, err)
 		return
 	}
-	topicIDs := make([]int64, len(topics))
-	for i, t := range topics {
-		topicIDs[i] = t.ID
-	}
-	hotnesses, _ := h.svc.GetTopicHotnesses(topicIDs)
 	c.JSON(http.StatusOK, model.TopicListResponse{
-		Topics:    topics,
-		Hotnesses: hotnesses,
-		Total:     total,
-		Page:      page,
-		Limit:     limit,
+		Topics: topics,
+		Total:  total,
+		Page:   page,
+		Limit:  limit,
 	})
 }
 
-// GetTopicTags returns all tags for a topic.
 func (h *Handler) GetTopicTags(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -390,7 +338,6 @@ func (h *Handler) GetTopicTags(c *gin.Context) {
 	c.JSON(http.StatusOK, tags)
 }
 
-// AddTopicTags adds tags to a topic.
 func (h *Handler) AddTopicTags(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -412,7 +359,6 @@ func (h *Handler) AddTopicTags(c *gin.Context) {
 	c.JSON(http.StatusOK, tags)
 }
 
-// UpdateTopicTags replaces the tags on a topic.
 func (h *Handler) UpdateTopicTags(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -432,7 +378,6 @@ func (h *Handler) UpdateTopicTags(c *gin.Context) {
 	c.JSON(http.StatusOK, tags)
 }
 
-// RemoveTopicTag removes a tag from a topic.
 func (h *Handler) RemoveTopicTag(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -440,7 +385,6 @@ func (h *Handler) RemoveTopicTag(c *gin.Context) {
 		return
 	}
 	tagName := c.Param("tag")
-	// Look up tag by name
 	tag, err := h.svc.GetTopicTagByName(tagName)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "tag not found"})
@@ -453,21 +397,6 @@ func (h *Handler) RemoveTopicTag(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "tag removed"})
 }
 
-// IncrementTopicView increments the topic view count.
-func (h *Handler) IncrementTopicView(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
-	}
-	if err := h.svc.IncrementTopicView(id); err != nil {
-		h.writeServiceError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"message": "view recorded"})
-}
-
-// ListTags lists all tags.
 func (h *Handler) ListTags(c *gin.Context) {
 	tags, err := h.svc.ListTags()
 	if err != nil {
@@ -475,156 +404,4 @@ func (h *Handler) ListTags(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, tags)
-}
-
-// --- Agent Memory Handlers ---
-
-// UpsertMemory creates or updates a memory entry for the authenticated agent.
-func (h *Handler) UpsertMemory(c *gin.Context) {
-	member := getAgentName(c)
-	if member == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "missing X-Agent-Name header"})
-		return
-	}
-
-	var req model.UpsertMemoryRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	mem, err := h.svc.UpsertMemory(member, &req)
-	if err != nil {
-		h.writeServiceError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, mem)
-}
-
-// GetMemory retrieves a specific memory by ID.
-func (h *Handler) GetMemory(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
-	}
-
-	mem, err := h.svc.GetMemory(id)
-	if err != nil {
-		h.writeServiceError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, mem)
-}
-
-// GetMyMemories retrieves all memory entries for the authenticated agent.
-func (h *Handler) GetMyMemories(c *gin.Context) {
-	member := getAgentName(c)
-	if member == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "missing X-Agent-Name header"})
-		return
-	}
-
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-
-	mems, total, err := h.svc.GetMyMemories(member, page, limit)
-	if err != nil {
-		h.writeServiceError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, model.MemoryListResponse{
-		Memories: wrapMemoriesWithAuthor(mems),
-		Total:    total,
-		Page:     page,
-		Limit:    limit,
-	})
-}
-
-// GetSharedMemories retrieves all shared memories across all agents.
-func (h *Handler) GetSharedMemories(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	query := c.Query("q") // search query
-
-	if query != "" {
-		mems, total, err := h.svc.SearchMemories(query, page, limit)
-		if err != nil {
-			h.writeServiceError(c, err)
-			return
-		}
-		c.JSON(http.StatusOK, model.MemoryListResponse{
-			Memories: wrapMemoriesWithAuthor(mems),
-			Total:    total,
-			Page:     page,
-			Limit:    limit,
-		})
-		return
-	}
-
-	mems, total, err := h.svc.GetSharedMemories(page, limit)
-	if err != nil {
-		h.writeServiceError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, model.MemoryListResponse{
-		Memories: wrapMemoriesWithAuthor(mems),
-		Total:    total,
-		Page:     page,
-		Limit:    limit,
-	})
-}
-
-// GetMemberMemories retrieves shared memories for a specific member.
-func (h *Handler) GetMemberMemories(c *gin.Context) {
-	memberName := c.Param("name")
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-
-	mems, total, err := h.svc.GetMemberSharedMemories(memberName, page, limit)
-	if err != nil {
-		h.writeServiceError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, model.MemoryListResponse{
-		Memories: wrapMemoriesWithAuthor(mems),
-		Total:    total,
-		Page:     page,
-		Limit:    limit,
-	})
-}
-
-// DeleteMemory deletes a memory entry.
-func (h *Handler) DeleteMemory(c *gin.Context) {
-	member := getAgentName(c)
-	if member == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "missing X-Agent-Name header"})
-		return
-	}
-
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
-	}
-
-	if err := h.svc.DeleteMemory(id, member); err != nil {
-		h.writeServiceError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"message": "memory deleted"})
-}
-
-// wrapMemoriesWithAuthor wraps agent memories with author name for response.
-func wrapMemoriesWithAuthor(mems []model.AgentMemory) []model.MemoryWithMember {
-	result := make([]model.MemoryWithMember, len(mems))
-	for i, m := range mems {
-		result[i] = model.MemoryWithMember{
-			AgentMemory: m,
-		}
-		if m.Member != nil {
-			result[i].AuthorName = m.Member.Name
-		}
-	}
-	return result
 }

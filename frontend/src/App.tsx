@@ -1,12 +1,11 @@
 import React from 'react'
-import { Badge, Button, Drawer, Layout, message } from 'antd'
+import { Badge, Button, Drawer, Layout } from 'antd'
 import TopicsList from './pages/TopicsList'
 import TopicDetail from './pages/TopicDetail'
 import NewTopicModal from './pages/NewTopicModal'
 import SettingsPanel from './pages/SettingsPanel'
 import NotificationsPanel from './pages/NotificationsPanel'
-import { getAgentName, getNotifications } from './api'
-import { forumWS, WSMessage } from './websocket'
+import { getNotifications } from './api'
 
 const { Header, Content, Sider } = Layout
 
@@ -17,8 +16,6 @@ export default function App() {
   const [notifCount, setNotifCount] = React.useState(0)
   const [mobileView, setMobileView] = React.useState<'list' | 'detail'>('list')
   const [drawerOpen, setDrawerOpen] = React.useState(false)
-  // Track topics we've subscribed to (to avoid double-subscribe)
-  const subscribedTopics = React.useRef<Set<number>>(new Set())
 
   const refreshNotifications = React.useCallback(async () => {
     try {
@@ -29,82 +26,9 @@ export default function App() {
     }
   }, [])
 
-  // Initial data load
   React.useEffect(() => {
     refreshNotifications()
-  }, [refreshKey])
-
-  // WebSocket integration
-  React.useEffect(() => {
-    forumWS.connect(getAgentName())
-
-    const unsubscribe = forumWS.on((msg: WSMessage) => {
-      switch (msg.type) {
-        case 'connected':
-          console.log('[App] WebSocket connected')
-          // Re-subscribe to currently viewed topic
-          if (selectedTopic != null && !subscribedTopics.current.has(selectedTopic)) {
-            forumWS.subscribe(selectedTopic)
-            subscribedTopics.current.add(selectedTopic)
-          }
-          break
-
-        case 'topic_created':
-          // New topic appeared — refresh the list
-          setRefreshKey(v => v + 1)
-          message.info('New topic: ' + (msg.topic?.title || msg.topic_id), 3)
-          break
-
-        case 'reply_created':
-          // A reply was added to a topic we care about
-          if (selectedTopic != null && msg.topic_id === selectedTopic) {
-            // TopicDetail will refresh itself via its own polling / onReplied; trigger a soft refresh
-            setRefreshKey(v => v + 1)
-          }
-          break
-
-        case 'topic_closed':
-          if (selectedTopic != null && msg.topic_id === selectedTopic) {
-            message.warning('This topic has been closed')
-            setSelectedTopic(null)
-          }
-          setRefreshKey(v => v + 1)
-          break
-
-        case 'notification':
-          // Someone @mentioned us or there's a reply notification
-          setNotifCount(c => c + 1)
-          break
-
-        case 'disconnected':
-          console.log('[App] WebSocket disconnected')
-          break
-
-        default:
-          break
-      }
-    })
-
-    return () => {
-      unsubscribe()
-      forumWS.close()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Manage topic subscriptions when selectedTopic changes
-  React.useEffect(() => {
-    if (selectedTopic != null) {
-      if (!subscribedTopics.current.has(selectedTopic)) {
-        forumWS.subscribe(selectedTopic)
-        subscribedTopics.current.add(selectedTopic)
-      }
-    }
-    return () => {
-      // Note: we keep subscriptions alive for the session since topics stay open
-      // If user navigates away and back, we re-subscribe in the connected handler
-    }
-  }, [selectedTopic])
+  }, [refreshNotifications, refreshKey])
 
   const handleOpenTopic = (id: number) => {
     setSelectedTopic(id)
@@ -119,7 +43,6 @@ export default function App() {
   }
 
   const handleReplied = () => {
-    // Trigger refresh to show new reply + update hotness
     setRefreshKey(v => v + 1)
   }
 
@@ -207,7 +130,6 @@ export default function App() {
           setSelectedTopic(id)
           setMobileView('detail')
           setRefreshKey(v => v + 1)
-          message.success('Topic created successfully')
         }}
       />
     </Layout>

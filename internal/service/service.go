@@ -118,11 +118,6 @@ func (s *Service) CreateTopic(creatorName, title, content string, mentions []str
 		return nil, err
 	}
 
-	// Initialize hotness record
-	if err := s.repo.EnsureTopicHotness(topic.ID); err != nil {
-		return nil, err
-	}
-
 	// Apply initial tags
 	if len(tags) > 0 {
 		if err := s.repo.SetTopicTags(topic.ID, tags); err != nil {
@@ -179,19 +174,6 @@ func (s *Service) CreateTopic(creatorName, title, content string, mentions []str
 	createdTopic, err := s.repo.GetTopic(topic.ID)
 	if err != nil {
 		return nil, err
-	}
-
-	// Broadcast new topic to all subscribers
-	s.maybeBroadcast(func() {
-		s.broker.BroadcastTopicCreated(createdTopic)
-	})
-
-	// Send Feishu notification if configured
-	if s.feishuNotifier != nil {
-		s.feishuNotifier.NotifyTopicCreated(feishu.TopicCreatedNotifyParams{
-			Topic:   createdTopic,
-			Creator: creator,
-		})
 	}
 
 	return createdTopic, nil
@@ -251,10 +233,6 @@ func (s *Service) CloseTopic(id int64, operatorName string) error {
 		return err
 	}
 
-	// Broadcast to WebSocket subscribers
-	s.maybeBroadcast(func() {
-		s.broker.BroadcastTopicClosed(id)
-	})
 	return nil
 }
 
@@ -288,9 +266,6 @@ func (s *Service) CreateReply(topicID int64, authorName, content string, replyTo
 		return nil, err
 	}
 
-	// Recalculate hotness after new reply
-	_ = s.RecalculateTopicHotness(topicID)
-
 	// Automatically mark the current user's unread mention notifications for this topic as read
 	notifications, err := s.repo.GetNotificationsByTopic(author.ID, topicID)
 	if err == nil {
@@ -316,20 +291,6 @@ func (s *Service) CreateReply(topicID int64, authorName, content string, replyTo
 	replies, err := s.repo.GetRepliesByTopic(topicID)
 	if err != nil {
 		return nil, err
-	}
-
-	// Broadcast to WebSocket subscribers
-	s.maybeBroadcast(func() {
-		s.broker.BroadcastReplyCreated(topicID, reply)
-	})
-
-	// Send Feishu notification if configured
-	if s.feishuNotifier != nil {
-		s.feishuNotifier.NotifyReplyCreated(feishu.ReplyCreatedNotifyParams{
-			Topic:  topic,
-			Reply:  reply,
-			Author: author,
-		})
 	}
 
 	return replies, nil
@@ -666,9 +627,6 @@ func (s *Service) GetTopicWithHotness(id int64) (*model.TopicWithReplies, error)
 
 // AddTagsToTopic adds tags to a topic.
 func (s *Service) AddTagsToTopic(topicID int64, tagNames []string) error {
-	if err := s.repo.EnsureTopicHotness(topicID); err != nil {
-		return err
-	}
 	for _, name := range tagNames {
 		name = strings.TrimSpace(name)
 		if name == "" {
@@ -682,29 +640,14 @@ func (s *Service) AddTagsToTopic(topicID int64, tagNames []string) error {
 			return err
 		}
 	}
-	// Broadcast updated topic to WebSocket subscribers
-	s.maybeBroadcast(func() {
-		if topic, err := s.repo.GetTopic(topicID); err == nil {
-			s.broker.BroadcastTopicUpdate(topicID, topic)
-		}
-	})
 	return nil
 }
 
 // SetTopicTags replaces the tags on a topic.
 func (s *Service) SetTopicTags(topicID int64, tagNames []string) error {
-	if err := s.repo.EnsureTopicHotness(topicID); err != nil {
-		return err
-	}
 	if err := s.repo.SetTopicTags(topicID, tagNames); err != nil {
 		return err
 	}
-	// Broadcast updated topic to WebSocket subscribers
-	s.maybeBroadcast(func() {
-		if topic, err := s.repo.GetTopic(topicID); err == nil {
-			s.broker.BroadcastTopicUpdate(topicID, topic)
-		}
-	})
 	return nil
 }
 
@@ -757,12 +700,6 @@ func (s *Service) RemoveTopicTag(topicID, tagID int64) error {
 	if err := s.repo.RemoveTagFromTopic(topicID, tagID); err != nil {
 		return err
 	}
-	// Broadcast updated topic to WebSocket subscribers
-	s.maybeBroadcast(func() {
-		if topic, err := s.repo.GetTopic(topicID); err == nil {
-			s.broker.BroadcastTopicUpdate(topicID, topic)
-		}
-	})
 	return nil
 }
 
