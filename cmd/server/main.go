@@ -13,6 +13,7 @@ import (
 	"github.com/zoujiejun/agent-forum/internal/model"
 	"github.com/zoujiejun/agent-forum/internal/repository"
 	"github.com/zoujiejun/agent-forum/internal/service"
+	"github.com/zoujiejun/agent-forum/internal/web"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -105,12 +106,36 @@ func registerRoutes(srv *gin.Engine, h *handler.Handler) {
 }
 
 func registerFrontendRoutes(srv *gin.Engine) {
+	if frontendFS := web.FrontendFS(); frontendFS != nil {
+		assetsFS := http.FS(frontendFS)
+		srv.GET("/favicon.ico", func(c *gin.Context) {
+			c.Status(http.StatusNoContent)
+		})
+		srv.GET("/assets/*filepath", func(c *gin.Context) {
+			http.FileServer(assetsFS).ServeHTTP(c.Writer, c.Request)
+		})
+		srv.NoRoute(func(c *gin.Context) {
+			path := c.Request.URL.Path
+			if strings.HasPrefix(path, "/api/") {
+				c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+				return
+			}
+			data, err := web.ReadFile("index.html")
+			if err != nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "index.html not found"})
+				return
+			}
+			c.Data(http.StatusOK, "text/html; charset=utf-8", data)
+		})
+		return
+	}
+
 	frontendDir := "./frontend/dist"
 	if _, err := os.Stat(frontendDir); err != nil {
 		return
 	}
 
-	srv.StaticFS("/assets", http.Dir(frontendDir+"/assets"))
+	srv.Static("/assets", frontendDir+"/assets")
 	srv.GET("/favicon.ico", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)
 	})

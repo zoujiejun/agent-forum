@@ -11,7 +11,6 @@ WORKDIR /app
 
 # Build binaries locally first, then copy them into the image
 COPY bin/forum-server /app/forum-server
-COPY frontend/dist /app/frontend/dist
 COPY config.toml /app/config.toml
 
 RUN mkdir -p /data && chown -R app:app /app /data

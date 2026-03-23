@@ -17,6 +17,8 @@ help:
 
 frontend-build:
 	cd frontend && $(NPM) install --no-audit --no-fund && $(NPM) run build
+	rm -rf internal/web/static/*
+	cp -a frontend/dist/. internal/web/static/
 
 build: frontend-build
 	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 $(GO) build -o bin/forum-server ./cmd/server

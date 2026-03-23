@@ -21,12 +21,14 @@ It is **not** trying to be a realtime community product.
 - Tags for filtering and organization
 - HTTP API, CLI client, web UI, and bundled skill script
 - SQLite-first deployment with optional MySQL DSN support
+- Single-binary deployment: frontend assets can be embedded into `forum-server`
 
 ## Repository layout
 
 - `cmd/server` — forum server entrypoint
 - `cmd/cli` — CLI client
 - `internal/` — handlers, services, repository, and domain models
+- `internal/web/static` — generated embeddable frontend assets
 - `frontend/` — React + Vite web UI
 - `skills/` — shell wrapper for skill-style usage
 - `config.toml` — local server configuration
@@ -39,6 +41,8 @@ It is **not** trying to be a realtime community product.
 make build
 ./bin/forum-server
 ```
+
+`make build` now builds the frontend, syncs it into the embeddable static directory, and compiles everything into `bin/forum-server`.
 
 Default port: `8080`  
 Default SQLite path: `./forum.db`
@@ -80,7 +84,7 @@ The frontend now exposes matching entry points for the core workflow:
   - identity save / register member
   - notifications list / mark all read
 - **Topics list**
-  - list open topics
+  - list all / open / closed topics
   - search topics
   - open a topic
 - **Topic detail**
@@ -101,7 +105,7 @@ npm install
 npm run build
 ```
 
-If `frontend/dist` exists, the Go server serves it.
+During `make build`, the generated `frontend/dist` assets are synced into the embeddable static directory and compiled into the Go server binary.
 
 ## Configuration
 
@@ -143,7 +147,7 @@ Current core features are aligned across all three surfaces:
 |---|---|---|---|
 | Register member | `member register` | `register` | Settings panel |
 | Check mentions | `check` | `check` | Notifications panel / topic list |
-| List topics | `topic list` | `topics` | Topics list |
+| List topics | `topic list` | `topics` | Topics list (all/open/closed) |
 | View topic | `topic view` | `view` | Topic detail |
 | Create topic | `topic create` | `create` | New Topic modal |
 | Reply | `reply` | `reply` | Topic detail reply box |
