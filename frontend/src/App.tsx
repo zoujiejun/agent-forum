@@ -1,13 +1,18 @@
 import React from 'react'
-import { Badge, Button, Drawer, Layout } from 'antd'
-import TopicsList from './pages/TopicsList'
-import TopicDetail from './pages/TopicDetail'
-import NewTopicModal from './pages/NewTopicModal'
-import SettingsPanel from './pages/SettingsPanel'
-import NotificationsPanel from './pages/NotificationsPanel'
+import { Badge, Button, Drawer, Layout, Skeleton } from 'antd'
 import { getNotifications } from './api'
 
+const TopicsList = React.lazy(() => import('./pages/TopicsList'))
+const TopicDetail = React.lazy(() => import('./pages/TopicDetail'))
+const NewTopicModal = React.lazy(() => import('./pages/NewTopicModal'))
+const SettingsPanel = React.lazy(() => import('./pages/SettingsPanel'))
+const NotificationsPanel = React.lazy(() => import('./pages/NotificationsPanel'))
+
 const { Header, Content, Sider } = Layout
+
+function PanelFallback() {
+  return <Skeleton active paragraph={{ rows: 3 }} title={{ width: '40%' }} />
+}
 
 export default function App() {
   const [selectedTopic, setSelectedTopic] = React.useState<number | null>(null)
@@ -85,53 +90,65 @@ export default function App() {
         width={280}
         className="mobile-drawer"
       >
-        <SettingsPanel onChanged={() => { setRefreshKey(v => v + 1); setDrawerOpen(false) }} />
-        <div style={{ height: 12 }} />
-        <NotificationsPanel refreshKey={refreshKey} onChanged={() => { setRefreshKey(v => v + 1) }} />
+        <React.Suspense fallback={<PanelFallback />}>
+          <SettingsPanel onChanged={() => { setRefreshKey(v => v + 1); setDrawerOpen(false) }} />
+          <div style={{ height: 12 }} />
+          <NotificationsPanel refreshKey={refreshKey} onChanged={() => { setRefreshKey(v => v + 1) }} />
+        </React.Suspense>
       </Drawer>
 
       <Layout className="desktop-layout">
         <Sider width={280} theme="light" className="desktop-sider">
-          <SettingsPanel onChanged={() => setRefreshKey(v => v + 1)} />
-          <div style={{ height: 12 }} />
-          <NotificationsPanel refreshKey={refreshKey} onChanged={() => { setRefreshKey(v => v + 1) }} />
+          <React.Suspense fallback={<PanelFallback />}>
+            <SettingsPanel onChanged={() => setRefreshKey(v => v + 1)} />
+            <div style={{ height: 12 }} />
+            <NotificationsPanel refreshKey={refreshKey} onChanged={() => { setRefreshKey(v => v + 1) }} />
+          </React.Suspense>
         </Sider>
         <Content className="desktop-content">
           <div className="desktop-split">
             <div className="topics-col">
-              <TopicsList refreshKey={refreshKey} onOpen={handleOpenTopic} />
+              <React.Suspense fallback={<PanelFallback />}>
+                <TopicsList refreshKey={refreshKey} onOpen={handleOpenTopic} />
+              </React.Suspense>
             </div>
             <div className="detail-col">
-              {selectedTopic ? (
-                <TopicDetail topicId={selectedTopic} onReplied={handleReplied} refreshKey={refreshKey} />
-              ) : (
-                <div className="empty-hint">Select a topic to view details</div>
-              )}
+              <React.Suspense fallback={<PanelFallback />}>
+                {selectedTopic ? (
+                  <TopicDetail topicId={selectedTopic} onReplied={handleReplied} refreshKey={refreshKey} />
+                ) : (
+                  <div className="empty-hint">Select a topic to view details</div>
+                )}
+              </React.Suspense>
             </div>
           </div>
         </Content>
       </Layout>
 
       <div className="mobile-content">
-        {mobileView === 'list' ? (
-          <TopicsList refreshKey={refreshKey} onOpen={handleOpenTopic} />
-        ) : (
-          selectedTopic ? (
-            <TopicDetail topicId={selectedTopic} onReplied={handleReplied} refreshKey={refreshKey} />
-          ) : null
-        )}
+        <React.Suspense fallback={<PanelFallback />}>
+          {mobileView === 'list' ? (
+            <TopicsList refreshKey={refreshKey} onOpen={handleOpenTopic} />
+          ) : (
+            selectedTopic ? (
+              <TopicDetail topicId={selectedTopic} onReplied={handleReplied} refreshKey={refreshKey} />
+            ) : null
+          )}
+        </React.Suspense>
       </div>
 
-      <NewTopicModal
-        open={showNewTopic}
-        onCancel={() => setShowNewTopic(false)}
-        onCreated={(id) => {
-          setShowNewTopic(false)
-          setSelectedTopic(id)
-          setMobileView('detail')
-          setRefreshKey(v => v + 1)
-        }}
-      />
+      <React.Suspense fallback={null}>
+        <NewTopicModal
+          open={showNewTopic}
+          onCancel={() => setShowNewTopic(false)}
+          onCreated={(id) => {
+            setShowNewTopic(false)
+            setSelectedTopic(id)
+            setMobileView('detail')
+            setRefreshKey(v => v + 1)
+          }}
+        />
+      </React.Suspense>
     </Layout>
   )
 }
