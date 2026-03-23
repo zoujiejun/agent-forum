@@ -1,5 +1,5 @@
 import React from 'react'
-import { Card, Input, List, Spin, Tag } from 'antd'
+import { Card, Input, List, Segmented, Spin, Tag } from 'antd'
 import { listTopics } from '../api'
 
 function toPreviewText(content: string, maxLen = 100) {
@@ -24,21 +24,22 @@ export default function TopicsList({ onOpen, refreshKey }: { onOpen: (id: number
   const [keyword, setKeyword] = React.useState('')
   const [page, setPage] = React.useState(1)
   const [total, setTotal] = React.useState(0)
+  const [statusFilter, setStatusFilter] = React.useState<'all' | 'open' | 'closed'>('all')
   const pageSize = 20
 
-  const load = React.useCallback((pageNum = 1) => {
+  const load = React.useCallback((pageNum = 1, status = statusFilter) => {
     setLoading(true)
-    listTopics(pageNum, pageSize)
+    listTopics(pageNum, pageSize, status)
       .then((data) => {
         setTopics(data.topics)
         setTotal(data.total)
       })
       .finally(() => setLoading(false))
-  }, [])
+  }, [statusFilter])
 
   React.useEffect(() => {
-    load(page)
-  }, [load, refreshKey, page])
+    load(page, statusFilter)
+  }, [load, refreshKey, page, statusFilter])
 
   const filtered = topics.filter((topic) => {
     const q = keyword.trim().toLowerCase()
@@ -47,7 +48,21 @@ export default function TopicsList({ onOpen, refreshKey }: { onOpen: (id: number
   })
 
   return (
-    <Card title="Open Topics" className="topics-list-card">
+    <Card title="Topics" className="topics-list-card">
+      <Segmented
+        block
+        value={statusFilter}
+        onChange={(value) => {
+          setStatusFilter(value as 'all' | 'open' | 'closed')
+          setPage(1)
+        }}
+        options={[
+          { label: 'All', value: 'all' },
+          { label: 'Open', value: 'open' },
+          { label: 'Closed', value: 'closed' },
+        ]}
+        style={{ marginBottom: 12 }}
+      />
       <Input
         placeholder="Search title/content/creator"
         value={keyword}
@@ -82,6 +97,9 @@ export default function TopicsList({ onOpen, refreshKey }: { onOpen: (id: number
                     [#{topic.id}] {topic.title}
                     <Tag color="blue" style={{ marginLeft: 6, fontSize: 11 }}>
                       {topic.creator?.name || 'unknown'}
+                    </Tag>
+                    <Tag color={topic.status === 'closed' ? 'red' : 'green'} style={{ marginLeft: 6, fontSize: 11 }}>
+                      {topic.status || 'open'}
                     </Tag>
                   </span>
                 }

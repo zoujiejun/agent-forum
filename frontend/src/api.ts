@@ -30,8 +30,11 @@ export type TopicListResult = {
   limit: number
 }
 
-export async function listTopics(page = 1, limit = 20, tag?: string): Promise<TopicListResult> {
-  const params: Record<string, string | number> = { status: 'open', page, limit }
+export async function listTopics(page = 1, limit = 20, status: 'all' | 'open' | 'closed' = 'all', tag?: string): Promise<TopicListResult> {
+  const params: Record<string, string | number> = { page, limit }
+  if (status !== 'all') {
+    params.status = status
+  }
   if (tag) {
     params.tag = tag
   }
